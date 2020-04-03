@@ -60,9 +60,10 @@ typedef struct parser_ctx {
 
 parser_ctx parser_context;
 
-struct statusline_head statusline_head = TAILQ_HEAD_INITIALIZER(statusline_head);
-/* Used temporarily while reading a statusline */
-struct statusline_head statusline_buffer = TAILQ_HEAD_INITIALIZER(statusline_buffer);
+struct statusline statusline = {
+    .blocks = TAILQ_HEAD_INITIALIZER(statusline.blocks),
+    .blocks_buffer = TAILQ_HEAD_INITIALIZER(statusline.blocks_buffer),
+};
 
 int child_stdin;
 
@@ -106,7 +107,7 @@ static void copy_statusline(struct statusline_head *from, struct statusline_head
  * the space allocated for the statusline.
  */
 __attribute__((format(printf, 1, 2))) static void set_statusline_error(const char *format, ...) {
-    clear_statusline(&statusline_head, true);
+    clear_statusline(&statusline.blocks, true);
 
     char *message;
     va_list args;
@@ -127,8 +128,8 @@ __attribute__((format(printf, 1, 2))) static void set_statusline_error(const cha
     message_block->color = sstrdup("#ff0000");
     message_block->no_separator = true;
 
-    TAILQ_INSERT_HEAD(&statusline_head, err_block, blocks);
-    TAILQ_INSERT_TAIL(&statusline_head, message_block, blocks);
+    TAILQ_INSERT_HEAD(&statusline.blocks, err_block, blocks);
+    TAILQ_INSERT_TAIL(&statusline.blocks, message_block, blocks);
 
 finish:
     FREE(message);
@@ -158,9 +159,9 @@ static void cleanup(void) {
  * previous entries from the buffer.
  */
 static int stdin_start_array(void *context) {
-    // the blocks are still used by statusline_head, so we won't free the
+    // the blocks are still used by statusline, so we won't free the
     // resources here.
-    clear_statusline(&statusline_buffer, false);
+    clear_statusline(&statusline.blocks_buffer, false);
     return 1;
 }
 
@@ -332,7 +333,7 @@ static int stdin_end_map(void *context) {
     if (new_block->short_text != NULL)
         i3string_set_markup(new_block->short_text, new_block->pango_markup);
 
-    TAILQ_INSERT_TAIL(&statusline_buffer, new_block, blocks);
+    TAILQ_INSERT_TAIL(&statusline.blocks_buffer, new_block, blocks);
     return 1;
 }
 
@@ -341,13 +342,13 @@ static int stdin_end_map(void *context) {
  * Copy it from the buffer to the actual statusline.
  */
 static int stdin_end_array(void *context) {
-    DLOG("copying statusline_buffer to statusline_head\n");
-    clear_statusline(&statusline_head, true);
-    copy_statusline(&statusline_buffer, &statusline_head);
+    DLOG("copying statusline blocks_buffer to blocks\n");
+    clear_statusline(&statusline.blocks, true);
+    copy_statusline(&statusline.blocks_buffer, &statusline.blocks);
 
     DLOG("dumping statusline:\n");
     struct status_block *current;
-    TAILQ_FOREACH (current, &statusline_head, blocks) {
+    TAILQ_FOREACH (current, &statusline.blocks, blocks) {
         DLOG("full_text = %s\n", i3string_as_utf8(current->full_text));
         DLOG("short_text = %s\n", (current->short_text == NULL ? NULL : i3string_as_utf8(current->short_text)));
         DLOG("color = %s\n", current->color);
@@ -402,7 +403,7 @@ static unsigned char *get_buffer(ev_io *watcher, int *ret_buffer_len) {
 }
 
 static void read_flat_input(char *buffer, int length) {
-    struct status_block *first = TAILQ_FIRST(&statusline_head);
+    struct status_block *first = TAILQ_FIRST(&statusline.blocks);
     /* Clear the old buffer if any. */
     I3STRING_FREE(first->full_text);
     /* Remove the trailing newline and terminate the string at the same
@@ -485,7 +486,7 @@ static void stdin_io_first_line_cb(struct ev_loop *loop, ev_io *watcher, int rev
         /* In case of plaintext, we just add a single block and change its
          * full_text pointer later. */
         struct status_block *new_block = scalloc(1, sizeof(struct status_block));
-        TAILQ_INSERT_TAIL(&statusline_head, new_block, blocks);
+        TAILQ_INSERT_TAIL(&statusline.blocks, new_block, blocks);
         read_flat_input((char *)buffer, rec);
     }
     free(buffer);

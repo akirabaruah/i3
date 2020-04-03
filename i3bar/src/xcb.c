@@ -199,7 +199,7 @@ static uint32_t predict_statusline_length(bool use_short_text) {
     uint32_t width = 0;
     struct status_block *block;
 
-    TAILQ_FOREACH (block, &statusline_head, blocks) {
+    TAILQ_FOREACH (block, &statusline.blocks, blocks) {
         i3String *text = block->full_text;
         struct status_block_render_desc *render = &block->full_render;
         if (use_short_text && block->short_text != NULL) {
@@ -262,7 +262,7 @@ static void draw_statusline(i3_output *output, uint32_t clip_left, bool use_focu
     uint32_t x = 0 - clip_left;
 
     /* Draw the text of each block */
-    TAILQ_FOREACH (block, &statusline_head, blocks) {
+    TAILQ_FOREACH (block, &statusline.blocks, blocks) {
         i3String *text = block->full_text;
         struct status_block_render_desc *render = &block->full_render;
         if (use_short_text && block->short_text != NULL) {
@@ -462,7 +462,7 @@ static void child_handle_button(xcb_button_press_event_t *event, i3_output *outp
     /* x of the start of the current block relative to the statusline. */
     uint32_t last_block_x = 0;
     struct status_block *block;
-    TAILQ_FOREACH (block, &statusline_head, blocks) {
+    TAILQ_FOREACH (block, &statusline.blocks, blocks) {
         i3String *text;
         struct status_block_render_desc *render;
         if (output->statusline_short_text && block->short_text != NULL) {
@@ -2076,7 +2076,7 @@ void draw_bars(bool unhide) {
             workspace_width += w;
         }
 
-        if (!TAILQ_EMPTY(&statusline_head)) {
+        if (!TAILQ_EMPTY(&statusline.blocks)) {
             DLOG("Printing statusline!\n");
 
             int tray_width = get_tray_width(outputs_walk->trayclients);

@@ -82,8 +82,20 @@ struct status_block {
     blocks;
 };
 
-extern TAILQ_HEAD(statusline_head, status_block)
-    statusline_head;
+TAILQ_HEAD(statusline_head, status_block);
+
+/* This data structure maintains the state of a single statusline. */
+struct statusline {
+    /* List of status_blocks rendered on this statusline. */
+    struct statusline_head blocks;
+    /* Used temporarily while reading a statusline's blocks. */
+    struct statusline_head blocks_buffer;
+    /* Horizontal space needed to render full_text for all blocks. */
+    uint32_t full_width;
+    /* Horizontal space needed to render short_text for all blocks. */
+    uint32_t short_width;
+};
+extern struct statusline statusline;
 
 #include "child.h"
 #include "ipc.h"
