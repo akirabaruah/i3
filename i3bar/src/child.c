@@ -68,10 +68,10 @@ struct statusline statusline = {
 int child_stdin;
 
 /*
- * Remove all blocks from the given statusline.
+ * Remove all status blocks from the given queue.
  * If free_resources is set, the fields of each status block will be free'd.
  */
-static void clear_statusline(struct statusline_head *head, bool free_resources) {
+static void clear_status_blocks(struct status_blocks_head *head, bool free_resources) {
     struct status_block *first;
     while (!TAILQ_EMPTY(head)) {
         first = TAILQ_FIRST(head);
@@ -91,7 +91,7 @@ static void clear_statusline(struct statusline_head *head, bool free_resources) 
     }
 }
 
-static void copy_statusline(struct statusline_head *from, struct statusline_head *to) {
+static void copy_status_blocks(struct status_blocks_head *from, struct status_blocks_head *to) {
     struct status_block *current;
     TAILQ_FOREACH (current, from, blocks) {
         struct status_block *new_block = smalloc(sizeof(struct status_block));
@@ -107,7 +107,7 @@ static void copy_statusline(struct statusline_head *from, struct statusline_head
  * the space allocated for the statusline.
  */
 __attribute__((format(printf, 1, 2))) static void set_statusline_error(const char *format, ...) {
-    clear_statusline(&statusline.blocks, true);
+    clear_status_blocks(&statusline.blocks, true);
 
     char *message;
     va_list args;
@@ -161,7 +161,7 @@ static void cleanup(void) {
 static int stdin_start_array(void *context) {
     // the blocks are still used by statusline, so we won't free the
     // resources here.
-    clear_statusline(&statusline.blocks_buffer, false);
+    clear_status_blocks(&statusline.blocks_buffer, false);
     return 1;
 }
 
@@ -343,8 +343,8 @@ static int stdin_end_map(void *context) {
  */
 static int stdin_end_array(void *context) {
     DLOG("copying statusline blocks_buffer to blocks\n");
-    clear_statusline(&statusline.blocks, true);
-    copy_statusline(&statusline.blocks_buffer, &statusline.blocks);
+    clear_status_blocks(&statusline.blocks, true);
+    copy_status_blocks(&statusline.blocks_buffer, &statusline.blocks);
 
     DLOG("dumping statusline:\n");
     struct status_block *current;
