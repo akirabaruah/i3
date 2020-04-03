@@ -464,7 +464,7 @@ static bool execute_custom_command(xcb_keycode_t input_code, bool event_is_relea
 }
 
 static void child_handle_button(xcb_button_press_event_t *event, i3_output *output, uint32_t statusline_x) {
-    if (statusline_x > (uint32_t)output->statusline_width) {
+    if (statusline_x > (uint32_t)output->statusline.width) {
         return;
     }
 
@@ -474,7 +474,7 @@ static void child_handle_button(xcb_button_press_event_t *event, i3_output *outp
     TAILQ_FOREACH (block, &statusline.blocks, blocks) {
         i3String *text;
         struct status_block_render_desc *render;
-        if (output->statusline_short_text && block->short_text != NULL) {
+        if (output->statusline.short_text && block->short_text != NULL) {
             text = block->short_text;
             render = &block->short_render;
         } else {
@@ -562,7 +562,7 @@ static void handle_button(xcb_button_press_event_t *event) {
         /* Calculate the horizontal coordinate (x) of the start of the
          * statusline by subtracting its width and the width of the tray from
          * the bar width. */
-        const int offset = walk->rect.w - walk->statusline_width -
+        const int offset = walk->rect.w - walk->statusline.width -
                            tray_width - logical_px((tray_width > 0) * sb_hoff_px);
         if (x >= offset) {
             /* Click was after the start of the statusline, return to avoid
@@ -1861,7 +1861,7 @@ void reconfig_windows(bool redraw_bars) {
 
             draw_util_surface_init(xcb_connection, &walk->bar, bar_id, NULL, walk->rect.w, bar_height);
             draw_util_surface_init(xcb_connection, &walk->buffer, buffer_id, NULL, walk->rect.w, bar_height);
-            draw_util_surface_init(xcb_connection, &walk->statusline_buffer, statusline_buffer_id, NULL, walk->rect.w, bar_height);
+            draw_util_surface_init(xcb_connection, &walk->statusline.buffer, statusline_buffer_id, NULL, walk->rect.w, bar_height);
 
             xcb_void_cookie_t strut_cookie = config_strut_partial(walk);
 
@@ -1905,7 +1905,7 @@ void reconfig_windows(bool redraw_bars) {
             xcb_free_pixmap(xcb_connection, walk->buffer.id);
 
             DLOG("Destroying statusline buffer for output %s\n", walk->name);
-            xcb_free_pixmap(xcb_connection, walk->statusline_buffer.id);
+            xcb_free_pixmap(xcb_connection, walk->statusline.buffer.id);
 
             DLOG("Reconfiguring window for output %s to %d,%d\n", walk->name, values[0], values[1]);
             xcb_void_cookie_t cfg_cookie = xcb_configure_window_checked(xcb_connection,
@@ -1932,17 +1932,17 @@ void reconfig_windows(bool redraw_bars) {
             DLOG("Recreating statusline buffer for output %s\n", walk->name);
             xcb_void_cookie_t slpm_cookie = xcb_create_pixmap_checked(xcb_connection,
                                                                       depth,
-                                                                      walk->statusline_buffer.id,
+                                                                      walk->statusline.buffer.id,
                                                                       walk->bar.id,
                                                                       walk->rect.w,
                                                                       bar_height);
 
             draw_util_surface_free(xcb_connection, &(walk->bar));
             draw_util_surface_free(xcb_connection, &(walk->buffer));
-            draw_util_surface_free(xcb_connection, &(walk->statusline_buffer));
+            draw_util_surface_free(xcb_connection, &(walk->statusline.buffer));
             draw_util_surface_init(xcb_connection, &(walk->bar), walk->bar.id, NULL, walk->rect.w, bar_height);
             draw_util_surface_init(xcb_connection, &(walk->buffer), walk->buffer.id, NULL, walk->rect.w, bar_height);
-            draw_util_surface_init(xcb_connection, &(walk->statusline_buffer), walk->statusline_buffer.id, NULL, walk->rect.w, bar_height);
+            draw_util_surface_init(xcb_connection, &(walk->statusline.buffer), walk->statusline.buffer.id, NULL, walk->rect.w, bar_height);
 
             xcb_void_cookie_t map_cookie, umap_cookie;
             if (redraw_bars) {
@@ -2105,12 +2105,12 @@ void draw_bars(bool unhide) {
             int16_t visible_statusline_width = MIN(statusline_width, max_statusline_width);
             int x_dest = outputs_walk->rect.w - tray_width - logical_px((tray_width > 0) * sb_hoff_px) - visible_statusline_width;
 
-            draw_statusline(&outputs_walk->statusline_buffer, &statusline, clip_left, use_focus_colors, use_short_text);
-            draw_util_copy_surface(&outputs_walk->statusline_buffer, &outputs_walk->buffer, 0, 0,
+            draw_statusline(&outputs_walk->statusline.buffer, &statusline, clip_left, use_focus_colors, use_short_text);
+            draw_util_copy_surface(&outputs_walk->statusline.buffer, &outputs_walk->buffer, 0, 0,
                                    x_dest, 0, visible_statusline_width, (int16_t)bar_height);
 
-            outputs_walk->statusline_width = statusline_width;
-            outputs_walk->statusline_short_text = use_short_text;
+            outputs_walk->statusline.width = statusline_width;
+            outputs_walk->statusline.short_text = use_short_text;
         }
     }
 
