@@ -26,12 +26,21 @@ struct rect_t {
     int h;
 };
 
+/* Text alignment within a block. */
 typedef enum {
     /* First value to make it the default. */
     ALIGN_LEFT,
     ALIGN_CENTER,
     ALIGN_RIGHT
 } blockalign_t;
+
+/* Block alignment within a statusline. */
+typedef enum {
+    /* First value to make it the default. */
+    STATUS_ALIGN_RIGHT,
+    STATUS_ALIGN_CENTER,
+    STATUS_ALIGN_LEFT
+} statusalign_t;
 
 /* This data structure describes the way a status block should be rendered. These
  * variables are updated each time the statusline is re-rendered. */
@@ -58,6 +67,7 @@ struct status_block {
     char *min_width_str;
 
     blockalign_t align;
+    statusalign_t align_statusline;
 
     bool urgent;
     bool no_separator;
@@ -96,7 +106,9 @@ struct statusline {
     /* Horizontal space needed to render short_text for all blocks. */
     uint32_t short_width;
 };
-extern struct statusline statusline;
+extern struct statusline statusline_center;
+extern struct statusline statusline_left;
+extern struct statusline statusline_right;
 
 #include "child.h"
 #include "ipc.h"

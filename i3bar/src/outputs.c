@@ -148,12 +148,18 @@ static int outputs_start_map_cb(void *params_) {
         new_output->primary = false;
         new_output->visible = false;
         new_output->ws = 0,
-        new_output->statusline.width = 0;
-        new_output->statusline.short_text = false;
+        new_output->statusline_center.width = 0;
+        new_output->statusline_left.width = 0;
+        new_output->statusline_right.width = 0;
+        new_output->statusline_center.short_text = false;
+        new_output->statusline_left.short_text = false;
+        new_output->statusline_right.short_text = false;
         memset(&new_output->rect, 0, sizeof(rect));
         memset(&new_output->bar, 0, sizeof(surface_t));
         memset(&new_output->buffer, 0, sizeof(surface_t));
-        memset(&new_output->statusline.buffer, 0, sizeof(surface_t));
+        memset(&new_output->statusline_center.buffer, 0, sizeof(surface_t));
+        memset(&new_output->statusline_left.buffer, 0, sizeof(surface_t));
+        memset(&new_output->statusline_right.buffer, 0, sizeof(surface_t));
 
         new_output->workspaces = smalloc(sizeof(struct ws_head));
         TAILQ_INIT(new_output->workspaces);

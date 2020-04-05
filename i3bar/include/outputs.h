@@ -70,8 +70,10 @@ struct i3_output {
 
     /* Off-screen buffer for preliminary rendering of the bar. */
     surface_t buffer;
-    /* Off-screen buffer and metadata for rendering the statusline. */
-    struct statusline_output statusline;
+    /* Off-screen buffers and metadata for rendering portions of the statusline. */
+    struct statusline_output statusline_center;
+    struct statusline_output statusline_left;
+    struct statusline_output statusline_right;
     /* The actual window on which we draw. */
     surface_t bar;
 

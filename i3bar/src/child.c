@@ -60,10 +60,14 @@ typedef struct parser_ctx {
 
 parser_ctx parser_context;
 
-struct statusline statusline = {
-    .blocks = TAILQ_HEAD_INITIALIZER(statusline.blocks),
-    .blocks_buffer = TAILQ_HEAD_INITIALIZER(statusline.blocks_buffer),
-};
+#define INIT_STATUSLINE(name)                                        \
+    struct statusline name = {                                       \
+        .blocks = TAILQ_HEAD_INITIALIZER(name.blocks),               \
+        .blocks_buffer = TAILQ_HEAD_INITIALIZER(name.blocks_buffer), \
+    }
+INIT_STATUSLINE(statusline_center);
+INIT_STATUSLINE(statusline_left);
+INIT_STATUSLINE(statusline_right);
 
 int child_stdin;
 
@@ -107,7 +111,9 @@ static void copy_status_blocks(struct status_blocks_head *from, struct status_bl
  * the space allocated for the statusline.
  */
 __attribute__((format(printf, 1, 2))) static void set_statusline_error(const char *format, ...) {
-    clear_status_blocks(&statusline.blocks, true);
+    clear_status_blocks(&statusline_center.blocks, true);
+    clear_status_blocks(&statusline_left.blocks, true);
+    clear_status_blocks(&statusline_right.blocks, true);
 
     char *message;
     va_list args;
@@ -128,8 +134,8 @@ __attribute__((format(printf, 1, 2))) static void set_statusline_error(const cha
     message_block->color = sstrdup("#ff0000");
     message_block->no_separator = true;
 
-    TAILQ_INSERT_HEAD(&statusline.blocks, err_block, blocks);
-    TAILQ_INSERT_TAIL(&statusline.blocks, message_block, blocks);
+    TAILQ_INSERT_HEAD(&statusline_right.blocks, err_block, blocks);
+    TAILQ_INSERT_TAIL(&statusline_right.blocks, message_block, blocks);
 
 finish:
     FREE(message);
@@ -161,7 +167,9 @@ static void cleanup(void) {
 static int stdin_start_array(void *context) {
     // the blocks are still used by statusline, so we won't free the
     // resources here.
-    clear_status_blocks(&statusline.blocks_buffer, false);
+    clear_status_blocks(&statusline_center.blocks_buffer, false);
+    clear_status_blocks(&statusline_left.blocks_buffer, false);
+    clear_status_blocks(&statusline_right.blocks_buffer, false);
     return 1;
 }
 
@@ -255,6 +263,16 @@ static int stdin_string(void *context, const unsigned char *val, size_t len) {
         }
         return 1;
     }
+    if (strcasecmp(ctx->last_map_key, "align_statusline") == 0) {
+        if (len == strlen("center") && !strncmp((const char *)val, "center", strlen("center"))) {
+            ctx->block.align_statusline = STATUS_ALIGN_CENTER;
+        } else if (len == strlen("left") && !strncmp((const char *)val, "left", strlen("left"))) {
+            ctx->block.align_statusline = STATUS_ALIGN_LEFT;
+        } else {
+            ctx->block.align_statusline = STATUS_ALIGN_RIGHT;
+        }
+        return 1;
+    }
     if (strcasecmp(ctx->last_map_key, "min_width") == 0) {
         sasprintf(&(ctx->block.min_width_str), "%.*s", len, val);
         return 1;
@@ -333,8 +351,28 @@ static int stdin_end_map(void *context) {
     if (new_block->short_text != NULL)
         i3string_set_markup(new_block->short_text, new_block->pango_markup);
 
-    TAILQ_INSERT_TAIL(&statusline.blocks_buffer, new_block, blocks);
+    switch (new_block->align_statusline) {
+        case STATUS_ALIGN_CENTER:
+            TAILQ_INSERT_TAIL(&statusline_center.blocks_buffer, new_block, blocks);
+            break;
+        case STATUS_ALIGN_LEFT:
+            TAILQ_INSERT_TAIL(&statusline_left.blocks_buffer, new_block, blocks);
+            break;
+        case STATUS_ALIGN_RIGHT:
+            TAILQ_INSERT_TAIL(&statusline_right.blocks_buffer, new_block, blocks);
+            break;
+    }
     return 1;
+}
+
+void dump_status_blocks(const struct status_blocks_head *status_blocks) {
+    struct status_block *current;
+    TAILQ_FOREACH (current, status_blocks, blocks) {
+        DLOG("full_text = %s\n", i3string_as_utf8(current->full_text));
+        DLOG("short_text = %s\n", (current->short_text == NULL ? NULL : i3string_as_utf8(current->short_text)));
+        DLOG("color = %s\n", current->color);
+        DLOG("align_statusline = %d\n", current->align_statusline);
+    }
 }
 
 /*
@@ -342,17 +380,20 @@ static int stdin_end_map(void *context) {
  * Copy it from the buffer to the actual statusline.
  */
 static int stdin_end_array(void *context) {
-    DLOG("copying statusline blocks_buffer to blocks\n");
-    clear_status_blocks(&statusline.blocks, true);
-    copy_status_blocks(&statusline.blocks_buffer, &statusline.blocks);
+    DLOG("copying statusline_buffer to statusline_head\n");
+    clear_status_blocks(&statusline_center.blocks, true);
+    clear_status_blocks(&statusline_left.blocks, true);
+    clear_status_blocks(&statusline_right.blocks, true);
+    copy_status_blocks(&statusline_center.blocks_buffer, &statusline_center.blocks);
+    copy_status_blocks(&statusline_left.blocks_buffer, &statusline_left.blocks);
+    copy_status_blocks(&statusline_right.blocks_buffer, &statusline_right.blocks);
 
-    DLOG("dumping statusline:\n");
-    struct status_block *current;
-    TAILQ_FOREACH (current, &statusline.blocks, blocks) {
-        DLOG("full_text = %s\n", i3string_as_utf8(current->full_text));
-        DLOG("short_text = %s\n", (current->short_text == NULL ? NULL : i3string_as_utf8(current->short_text)));
-        DLOG("color = %s\n", current->color);
-    }
+    DLOG("dumping statusline_center:\n");
+    dump_status_blocks(&statusline_center.blocks);
+    DLOG("dumping statusline_left:\n");
+    dump_status_blocks(&statusline_left.blocks);
+    DLOG("dumping statusline_right:\n");
+    dump_status_blocks(&statusline_right.blocks);
     DLOG("end of dump\n");
     return 1;
 }
@@ -403,7 +444,7 @@ static unsigned char *get_buffer(ev_io *watcher, int *ret_buffer_len) {
 }
 
 static void read_flat_input(char *buffer, int length) {
-    struct status_block *first = TAILQ_FIRST(&statusline.blocks);
+    struct status_block *first = TAILQ_FIRST(&statusline_right.blocks);
     /* Clear the old buffer if any. */
     I3STRING_FREE(first->full_text);
     /* Remove the trailing newline and terminate the string at the same
@@ -486,7 +527,7 @@ static void stdin_io_first_line_cb(struct ev_loop *loop, ev_io *watcher, int rev
         /* In case of plaintext, we just add a single block and change its
          * full_text pointer later. */
         struct status_block *new_block = scalloc(1, sizeof(struct status_block));
-        TAILQ_INSERT_TAIL(&statusline.blocks, new_block, blocks);
+        TAILQ_INSERT_TAIL(&statusline_right.blocks, new_block, blocks);
         read_flat_input((char *)buffer, rec);
     }
     free(buffer);
